@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cycle Syncing Tracker</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f9f9f9;
+      color: #333;
+      text-align: center;
+    }
+    h1 {
+      margin-bottom: 20px;
+    }
+    .calendar {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 5px;
+      max-width: 400px;
+      margin: auto;
+    }
+    .day {
+      padding: 10px;
+      text-align: center;
+      border-radius: 5px;
+      cursor: pointer;
+      border: 1px solid #ddd;
+      background-color: #fff;
+      transition: background-color 0.3s;
+    }
+    .day:hover {
+      background-color: #f1f1f1;
+    }
+    .menstrual { background-color: #ffadad !important; }  /* Rosso */
+    .follicular { background-color: #9dd3fc !important; }  /* Azzurro */
+    .ovulation { background-color: #bdfc9d !important; }  /* Verde */
+    .luteal { background-color: #fcf49d !important; }  /* Giallo */
+    .selected {
+      border: 2px solid #333;
+    }
+    .controls {
+      margin: 20px 0;
+    }
+    .phase-info {
+      margin-top: 20px;
+      padding: 10px;
+      background-color: #fff;
+      border-radius: 5px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      max-width: 400px;
+      margin: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>Cycle Syncing Tracker</h1>
+
+  <div class="controls">
+    <label for="cycle-start">Select first day of your cycle:</label>
+    <input type="date" id="cycle-start">
+    <button onclick="calculateCycle()">Track</button>
+  </div>
+
+  <div class="calendar" id="calendar"></div>
+
+  <div class="phase-info" id="phase-info">
+    <strong>Current Phase:</strong> <span id="current-phase">Select a date</span>
+  </div>
+
+  <script>
+    function generateCalendar() {
+      const calendar = document.getElementById("calendar");
+      calendar.innerHTML = ""; 
+      const daysInMonth = 30; // Simuliamo un mese di 30 giorni
+      
+      for (let i = 1; i <= daysInMonth; i++) {
+        const day = document.createElement("div");
+        day.classList.add("day");
+        day.textContent = i;
+        day.dataset.day = i;
+        calendar.appendChild(day);
+      }
+    }
+
+    function calculateCycle() {
+      const startDate = new Date(document.getElementById("cycle-start").value);
+      if (isNaN(startDate)) {
+        alert("Please select a valid date.");
+        return;
+      }
+
+      const days = document.querySelectorAll(".day");
+      days.forEach(day => {
+        day.classList.remove("menstrual", "follicular", "ovulation", "luteal", "selected");
+      });
+
+      let cycleLength = 28; // Default cycle length
+      let lutealStart = cycleLength - 14; // Fase luteale parte 14 giorni prima della fine
+
+      for (let i = 0; i < cycleLength; i++) {
+        const currentDay = new Date(startDate);
+        currentDay.setDate(startDate.getDate() + i);
+        const dayNumber = currentDay.getDate();
+        const dayElement = document.querySelector(`.day[data-day="${dayNumber}"]`);
+
+        if (dayElement) {
+          if (i < 5) {
+            dayElement.classList.add("menstrual"); 
+          } else if (i < lutealStart - 4) {
+            dayElement.classList.add("follicular");
+          } else if (i < lutealStart) {
+            dayElement.classList.add("ovulation");
+          } else {
+            dayElement.classList.add("luteal");
+          }
+
+          if (i === 0) {
+            dayElement.classList.add("selected");
+          }
+        }
+      }
+
+      updateCurrentPhase();
+    }
+
+    function updateCurrentPhase() {
+      const today = new Date().getDate();
+      const todayElement = document.querySelector(`.day[data-day="${today}"]`);
+
+      if (todayElement) {
+        let phase = "";
+        if (todayElement.classList.contains("menstrual")) {
+          phase = "Menstrual Phase 🩸";
+        } else if (todayElement.classList.contains("follicular")) {
+          phase = "Follicular Phase 🌱";
+        } else if (todayElement.classList.contains("ovulation")) {
+          phase = "Ovulation Phase 🥚";
+        } else if (todayElement.classList.contains("luteal")) {
+          phase = "Luteal Phase 🔥";
+        }
+
+        document.getElementById("current-phase").textContent = phase;
+      }
+    }
+
+    generateCalendar();
+  </script>
+</body>
+</html>
