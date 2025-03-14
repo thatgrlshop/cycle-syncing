@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cycle Syncing Tracker</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background-color: #f9f9f9;
+      color: #333;
+      text-align: center;
+    }
+    .container {
+      max-width: 400px;
+      margin: auto;
+      padding: 20px;
+      background-color: white;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+    .month-navigation {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    .calendar {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 5px;
+    }
+    .day {
+      padding: 10px;
+      border-radius: 5px;
+      background-color: #f0f0f0;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    .day:hover {
+      background-color: #ddd;
+    }
+    .menstrual { background-color: #A17E89 !important; color: white; }
+    .follicular { background-color: #F6D3DB !important; }
+    .ovulatory { background-color: #FBE3E9 !important; }
+    .luteal { background-color: #FDECF1 !important; }
+    .predicted { background-color: #d3d3d3 !important; color: black; }
+    .phase-info { margin-top: 15px; font-size: 16px; font-weight: bold; }
+    .cycle-settings { margin-top: 10px; }
+    .cycle-settings input { width: 50px; text-align: center; padding: 5px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Cycle Syncing Tracker</h2>
+
+    <div class="month-navigation">
+      <button id="prev-month">◀</button>
+      <span id="month-year"></span>
+      <button id="next-month">▶</button>
+    </div>
+
+    <div class="cycle-settings">
+      <label>Cycle length (days): </label>
+      <input type="number" id="cycle-length" value="28" min="20" max="40">
+      <button id="save-cycle-length">Save</button>
+    </div>
+
+    <div class="calendar" id="calendar"></div>
+    <p>Double click to track your cycle.</p>
+    <p class="phase-info" id="phase-info"></p>
+  </div>
+
+  <script>
+    let cycleLength = localStorage.getItem("cycleLength") ? parseInt(localStorage.getItem("cycleLength")) : 28;
+    let cycleData = JSON.parse(localStorage.getItem("cycleData")) || {};
+    let currentMonth = new Date().getMonth();
+    let currentYear = new Date().getFullYear();
+
+    document.getElementById("cycle-length").value = cycleLength;
+
+    function generateCalendar() {
+      const calendar = document.getElementById("calendar");
+      calendar.innerHTML = "";
+
+      const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+      document.getElementById("month-year").textContent = 
+        new Date(currentYear, currentMonth).toLocaleString('default', { month: 'long', year: 'numeric' });
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dayElement = document.createElement("div");
+        dayElement.classList.add("day");
+        dayElement.textContent = day;
+
+        let key = `${currentYear}-${currentMonth + 1}-${day}`;
+        if (cycleData[key]) {
+          dayElement.classList.add("menstrual");
+        } else {
+          let phase = getCyclePhase(day);
+          if (phase) dayElement.classList.add(phase);
+        }
+
+        if (!cycleData[key] && isPredictedCycle(day)) {
+          dayElement.classList.add("predicted");
+        }
+
+        dayElement.addEventListener("click", () => showPhaseInfo(day));
+        dayElement.addEventListener("dblclick", () => toggleCycleDay(day));
+
+        calendar.appendChild(dayElement);
+      }
+    }
+
+    function isPredictedCycle(day) {
+      let lastCycle = getLastCycleDate();
+      if (!lastCycle) return false;
+
+      let predictedStart = new Date(lastCycle);
+      while (predictedStart < new Date(currentYear, currentMonth, day)) {
+        predictedStart.setDate(predictedStart.getDate() + cycleLength);
+      }
+      return predictedStart.getDate() === day;
+    }
+
+    function toggleCycleDay(day) {
+      let key = `${currentYear}-${currentMonth + 1}-${day}`;
+
+      if (cycleData[key]) {
+        delete cycleData[key]; 
+      } else {
+        let confirmChange = confirm("This will update the cycle phases. Do you want to proceed?");
+        if (confirmChange) {
+          Object.keys(cycleData).forEach(k => {
+            if (new Date(k).getFullYear() === currentYear && new Date(k).getMonth() === currentMonth) {
+              delete cycleData[k];
+            }
+          });
+          cycleData[key] = true;
+        }
+      }
+
+      localStorage.setItem("cycleData", JSON.stringify(cycleData));
+      generateCalendar();
+    }
+
+    function getCyclePhase(day) {
+      let firstCycleDay = getLastCycleDate();
+      if (!firstCycleDay) return null;
+
+      let dayDiff = (new Date(currentYear, currentMonth, day) - firstCycleDay) / (1000 * 60 * 60 * 24);
+      if (dayDiff >= 0 && dayDiff < 5) return "menstrual";
+      if (dayDiff >= 5 && dayDiff < 14) return "follicular";
+      if (dayDiff >= 14 && dayDiff < 17) return "ovulatory";
+      if (dayDiff >= 17) return "luteal";
+      return null;
+    }
+
+    function getLastCycleDate() {
+      let lastDate = null;
+      Object.keys(cycleData).forEach(key => {
+        let [year, month, date] = key.split("-").map(Number);
+        let cycleDate = new Date(year, month - 1, date);
+        if (cycleDate <= new Date(currentYear, currentMonth, 1)) {
+          lastDate = cycleDate;
+        }
+      });
+      return lastDate;
+    }
+
+    function showPhaseInfo(day) {
+      let phase = getCyclePhase(day);
+      let descriptions = {
+        menstrual: "Menstrual Phase: Your period. Rest and recovery are key.",
+        follicular: "Follicular Phase: Energy increases, best time for new projects.",
+        ovulatory: "Ovulatory Phase: Peak energy, socializing, and confidence.",
+        luteal: "Luteal Phase: Time to slow down, focus on self-care."
+      };
+      document.getElementById("phase-info").textContent = descriptions[phase] || "";
+    }
+
+    document.getElementById("prev-month").addEventListener("click", () => {
+      currentMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+      if (currentMonth === 11) currentYear--;
+      generateCalendar();
+    });
+
+    document.getElementById("next-month").addEventListener("click", () => {
+      currentMonth = currentMonth === 11 ? 0 : currentMonth + 1;
+      if (currentMonth === 0) currentYear++;
+      generateCalendar();
+    });
+
+    document.getElementById("save-cycle-length").addEventListener("click", () => {
+      cycleLength = parseInt(document.getElementById("cycle-length").value);
+      localStorage.setItem("cycleLength", cycleLength);
+      generateCalendar();
+    });
+
+    generateCalendar();
+  </script>
+</body>
+</html>
